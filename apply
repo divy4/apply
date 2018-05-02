@@ -1,0 +1,64 @@
+#!/bin/bash
+
+labelOutput="/home/dan/project_hdd/project/bin/labelOutput"
+
+if [ $# -lt 3 ]
+then
+    echo "Usage: apply <number of workers> <directory> <worker> [arguments...] "
+    echo "Calls <worker> with [arguments...] to every subdirectory in <directory>."
+    echo "Also, in [arguments...], all instances of _id_, _exe_, and _path_ are replaced with the id of the task, the path the apply was called from, and the path the task is being called in before being passed on to the worker."
+
+    echo "<number of workers> indicates the number of concurent processes used to call <worker>. If <number of processes> is 1, <worker> will be called in the foreground and in order for each subdirectory"
+    exit
+fi
+
+i=0
+exePath="$(pwd)"
+script="$(which $3)"
+baseDir="$exePath/$2"
+baseArgs="${@:4}"
+maxWorkers=$(($1))
+
+# runs a script, but labels each line of output with a label
+run() {
+    label="$1"
+    exe="$2"
+    args="${@:3}"
+
+    echo "$label: start"
+    $exe $args |& while read -r line
+    do
+        echo "$label: $line"
+    done
+    echo "$label: end"
+}
+
+id=0
+while read -r item
+do
+    id=$(($id + 1))
+
+    # move to directory
+    path="$baseDir/$item"
+    cd "$path"
+
+    # build args
+    args="$baseArgs"
+    args="${args/_id_/$id}"
+    args="${args/_exe_/$exePath}"
+    args="${args/_path_/$path}"
+
+    # call worker script
+    if [ $maxWorkers -le 1 ]
+    then
+        run $id "$script" "$args"
+    else
+        run $id "$script" "$args" &
+    fi
+    
+    # sleep if too many workers are working
+    while (( $(( $(ps -eo ppid | grep $$ | wc -l) )) > $(($maxWorkers)) ))
+    do
+        sleep 0.1
+    done
+done <<< $(ls -1F "$2" | grep /)
