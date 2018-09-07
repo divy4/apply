@@ -1,7 +1,5 @@
 #!/bin/bash
 
-labelOutput="/home/dan/project_hdd/project/bin/labelOutput"
-
 if [ $# -lt 3 ]
 then
     echo "Usage: apply <number of workers> <directory> <worker> [arguments...] "
